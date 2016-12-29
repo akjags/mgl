@@ -21,17 +21,18 @@ yLimit = myScreen.imageHeight / 2;
 mglFixationCross();
 
 %frameNum = 4;
-bar1Contrast = 0.3;
-bar2Contrast = 0.6;
+contrasts = [0.2 0.8; 0.5 0.5; 0.1 0.9; 0.45 0.45];
+contrasts = contrasts(randperm(length(contrasts)), :);
 
 % Bar Directions
 deg = 0:45:315;
-dirs = [1 4; 1 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
-%dirs = dirs(randperm(length(dirs)),:);
-for k = 1:8
-dir1 = dirs(k,1);
-dir2 = dirs(k,2);
-disp(sprintf('Bar 1: (%i) %i degrees; Bar 2: (%i) %i degrees', dir1, deg(dir1), dir2, deg(dir2)));
+%all pairs except parallel and antiparallel lines.
+dirs = [1 3; 1 7; 5 3; 5 7; 1 4; 2 4; 2 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
+dirs = dirs(randperm(length(dirs)),:);
+for k = 1:4
+dir1 = dirs(k,1); dir2 = dirs(k,2);
+cont1 = contrasts(k,1); cont2 = contrasts(k,2);
+disp(sprintf('Bar 1: (%i) %i degrees, %i contrast; Bar 2: (%i) %i degrees, %i contrast', dir1, deg(dir1), cont1, dir2, deg(dir2), cont2));
   for frameNum = 1:20
   % Draw stencil for bar #1
   mglStencilCreateBegin(1);
@@ -61,15 +62,16 @@ disp(sprintf('Bar 1: (%i) %i degrees; Bar 2: (%i) %i degrees', dir1, deg(dir1), 
     for i = 1:5
     % Draw checkerboard, stenciled by #1
     mglStencilSelect(1);
-    drawCheckerboard(bar1Contrast, i);
+    drawCheckerboard(cont1, i);
 
     mglStencilSelect(2);
-    drawCheckerboard(bar2Contrast, i);
+    drawCheckerboard(cont2, i);
 
     mglStencilSelect(3);
-    drawCheckerboard(bar1Contrast + bar2Contrast, i);
+    drawCheckerboard(cont1+cont2, i);
 
     mglStencilSelect(0);
+    mglFixationCross(0.5, 2, [0,1,1]);
     mglFlush;
     mglClearScreen;
     end
