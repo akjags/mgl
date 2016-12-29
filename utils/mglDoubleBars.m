@@ -11,6 +11,8 @@ function mglDoubleBars(numBlocks)
 
 global myScreen xLimit yLimit;
 myScreen.background = 'gray';
+myScreen.transparentBackground = false;
+myScreen.setVolume = false;
 myScreen = initScreen(myScreen);
 xLimit = myScreen.imageWidth / 2;
 yLimit = myScreen.imageHeight / 2;
@@ -23,13 +25,13 @@ bar1Contrast = 0.3;
 bar2Contrast = 0.6;
 
 % Bar Directions
-dirs = [2 4; 2 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
-dirs = dirs(randperm(length(dirs)),:);
-disp(sprintf('length of dirs: %i', length(dirs)));
+deg = 0:45:315;
+dirs = [1 4; 1 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
+%dirs = dirs(randperm(length(dirs)),:);
 for k = 1:8
 dir1 = dirs(k,1);
 dir2 = dirs(k,2);
-disp(sprintf('Dir1: %i, Dir2: %i', dir1, dir2));
+disp(sprintf('Bar 1: (%i) %i degrees; Bar 2: (%i) %i degrees', dir1, deg(dir1), dir2, deg(dir2)));
   for frameNum = 1:20
   % Draw stencil for bar #1
   mglStencilCreateBegin(1);
@@ -46,7 +48,13 @@ disp(sprintf('Dir1: %i, Dir2: %i', dir1, dir2));
   % Calculate overlap of bars
   %
   mglStencilCreateBegin(3);
-  calcDrawOverlap(c1, c2);
+  if dir1 == 1 || dir1 == 5
+    calcDrawOverlap(c1,c2,1);
+  elseif dir2 == 1 || dir2 == 5
+    calcDrawOverlap(c1,c2,2);
+  else
+    calcDrawOverlap(c1, c2);
+  end
   mglStencilCreateEnd;
   mglClearScreen;
 
@@ -82,19 +90,42 @@ return
 % Calculates the coordinates of the area of overlap between two bars, and draws it using mglPolygon
 % Arguments: 
 %        bar1, bar2 --> coordinates arrays in the form [x1 y1; x2 y2; x3 y3; x4 y4]
-function calcDrawOverlap(bar1, bar2)
+function calcDrawOverlap(bar1, bar2, vert)
 
-% for each bar, first calculate the line (y=mx+b) between points 1 and 2, and points 3 and 4 (long sides)
-[rB1(1), rB1(2)] = calculateLine(bar1(1,:), bar1(2,:));
-[fB1(1), fB1(2)] = calculateLine(bar1(3,:), bar1(4,:));
+if ieNotDefined('vert')
+  vert = 0;
+end
 
-[rB2(1), rB2(2)] = calculateLine(bar2(1,:), bar2(2,:));
-[fB2(1), fB2(2)] = calculateLine(bar2(3,:), bar2(4,:));
+if vert ~= 1
+  % for each bar, first calculate the line (y=mx+b) between points 1 and 2, and points 3 and 4 (long sides)
+  [rB1(1), rB1(2)] = calculateLine(bar1(1,:), bar1(2,:));
+  [fB1(1), fB1(2)] = calculateLine(bar1(3,:), bar1(4,:));
+end
 
-[p1(1), p1(2)] = calculateIntersect(rB1, rB2);
-[p2(1), p2(2)] = calculateIntersect(rB1, fB2);
-[p3(1), p3(2)] = calculateIntersect(fB1, fB2);
-[p4(1), p4(2)] = calculateIntersect(fB1, rB2);
+if vert ~= 2
+  [rB2(1), rB2(2)] = calculateLine(bar2(1,:), bar2(2,:));
+  [fB2(1), fB2(2)] = calculateLine(bar2(3,:), bar2(4,:));
+end
+
+if vert == 1
+  x1 = bar1(1,1); x2 = bar1(3,1);
+  p1(1) = x1; p1(2) = rB2(1)*x1 + rB2(2);
+  p2(1) = x2; p2(2) = rB2(1)*x2 + rB2(2);
+  p3(1) = x2; p3(2) = fB2(1)*x2 + fB2(2);
+  p4(1) = x1; p4(2) = fB2(1)*x1 + fB2(2);
+elseif vert == 2
+  x1 = bar2(1,1); x2 = bar2(1,1);
+  p1(1) = x1; p1(2) = rB1(1)*x1 + rB1(2);
+  p2(1) = x2; p2(2) = rB1(1)*x2 + rB1(2);
+  p3(1) = x2; p3(2) = fB1(1)*x2 + fB1(2);
+  p4(1) = x1; p4(2) = fB1(1)*x1 + fB1(2);
+else
+  [p1(1), p1(2)] = calculateIntersect(rB1, rB2);
+  [p2(1), p2(2)] = calculateIntersect(rB1, fB2);
+  [p3(1), p3(2)] = calculateIntersect(fB1, fB2);
+  [p4(1), p4(2)] = calculateIntersect(fB1, rB2);
+end
+
 intersect = [p1; p2; p3; p4];
 mglPolygon(intersect(:,1)', intersect(:,2)', 0);
 
