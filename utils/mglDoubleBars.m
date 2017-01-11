@@ -7,33 +7,72 @@
 %
 %
 
-function mglDoubleBars(numBlocks)
+function [myScreen,myStimulus] = mglDoubleBars(numBlocks)
 
-global myScreen xLimit yLimit;
-myScreen.background = 'gray';
-myScreen.transparentBackground = false;
-myScreen.setVolume = false;
-myScreen = initScreen(myScreen);
+global myScreen xLimit yLimit stimulus;
+
+% Initialize the screen
+myScreen = initScreen('bowmore');
 xLimit = myScreen.imageWidth / 2;
 yLimit = myScreen.imageHeight / 2;
 
-% Draw fixation cross
-mglFixationCross();
+% Set the first task to be the fixation staircase task
+[task{1} myScreen] = fixStairInitTask(myScreen);
 
-%frameNum = 4;
-contrasts = [0.2 0.8; 0.5 0.5; 0.1 0.9; 0.45 0.45];
+% Task 2 is the retinotopy double bars
+task{2}.waitForBacktick = 1;
+task{2}.segmin = [10 1];
+task{2}.segmax = [10 1];
+task{2}.parameter.dir1 = 0:45:315;
+task{2}.parameter.dir2 = 0:45:315;
+task{2}.parameter.cont1 = [0.3 0.4 0.5];
+task{2}.random = 1;
+t remo
+% init the stimulus
+global stimulus;
+myScreen = initStimulus('stimulus', myScreen);
+stimulus = 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Main display loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+phaseNum = 1;
+while (phaseNum <= length(task{2})) && ~myscreen.userHitEsc
+  % update the task
+  [task{2} myscreen phaseNum] = updateTask(task,myscreen,phaseNum);
+  % flip screen
+  myscreen = tickScreen(myscreen,task);
+end
+
+% if we got here, we are at the end of the experiment
+myscreen = endTask(myscreen,task);
+
+
+%myScreen.background = 'gray';
+%myScreen.transparentBackground = false;
+
+% Specify possible contrast pairs and direction pairs
+contrasts = [0.3 0.6; 0.2 0.7; 0.8 0.2; 0.45 0.45];
+deg = 0:45:315; % draw pairs from the set of angles 0 to 315 in increments of 45
+dirs = [1 3; 1 7; 5 3; 5 7; 1 4; 2 4; 2 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
+% Then randomly permute
+dirs = dirs(randperm(length(dirs)),:);
 contrasts = contrasts(randperm(length(contrasts)), :);
 
-% Bar Directions
-deg = 0:45:315;
-%all pairs except parallel and antiparallel lines.
-dirs = [1 3; 1 7; 5 3; 5 7; 1 4; 2 4; 2 8; 6 4; 6 8; 2 3; 2 7; 6 3; 6 7; 3 4; 3 8; 7 4; 7 8];
-dirs = dirs(randperm(length(dirs)),:);
-for k = 1:4
+% Keep track of stimulus image
+numFrames = 20; numSweeps = 4;
+%stimImage = zeros(2*yLimit, 2*xLimit, numFrames*numSweeps);
+
+for k = 1:numSweeps
+
 dir1 = dirs(k,1); dir2 = dirs(k,2);
 cont1 = contrasts(k,1); cont2 = contrasts(k,2);
-disp(sprintf('Bar 1: (%i) %i degrees, %i contrast; Bar 2: (%i) %i degrees, %i contrast', dir1, deg(dir1), cont1, dir2, deg(dir2), cont2));
-  for frameNum = 1:20
+disp(sprintf('Sweep %i', k))
+disp(sprintf('\tBar 1: (%i) %i degrees, %i%% contrast', dir1, deg(dir1), 100*cont1));
+disp(sprintf('\tBar 2: (%i) %i degrees, %i%% contrast', dir2, deg(dir2), 100*cont2));
+
+  for frameNum = 1:numFrames
   % Draw stencil for bar #1
   mglStencilCreateBegin(1);
   c1 = drawBars(dir1, frameNum);
@@ -47,7 +86,6 @@ disp(sprintf('Bar 1: (%i) %i degrees, %i contrast; Bar 2: (%i) %i degrees, %i co
   mglClearScreen;
 
   % Calculate overlap of bars
-  %
   mglStencilCreateBegin(3);
   if dir1 == 1 || dir1 == 5
     calcDrawOverlap(c1,c2,1);
@@ -77,7 +115,6 @@ disp(sprintf('Bar 1: (%i) %i degrees, %i contrast; Bar 2: (%i) %i degrees, %i co
     end
   end
 end
-
 
 return 
 
@@ -199,25 +236,29 @@ switch barDirection
     yCorners = [yLimit, -yLimit, -yLimit, yLimit];
   case 2 % 45: bar moves top left to bottom right
     xCorners = [xLimit - sqrt(2)-init+frameNum, -xLimit-init+frameNum, -xLimit+sqrt(2)-init+frameNum, xLimit-init+frameNum];
-    yCorners = [yLimit+init-frameNum, -yLimit+sqrt(2)+init-frameNum, -yLimit+init-frameNum, yLimit-sqrt(2)+init-frameNum];
+    %yCorners = [yLimit+init-frameNum, -yLimit+sqrt(2)+init-frameNum, -yLimit+init-frameNum, yLimit-sqrt(2)+init-frameNum];
+    yCorners = [xLimit+init-frameNum, -xLimit+sqrt(2)+init-frameNum,-xLimit+init-frameNum, xLimit-sqrt(2)+init-frameNum];
   case 3
     xCorners = [-xLimit, xLimit, xLimit, -xLimit];
     yCorners = [yLimit-frameNum, yLimit-frameNum, yLimit-2-frameNum, yLimit-2-frameNum];
   case 4 % 135: bar moves top right to bottom left
     xCorners = [-xLimit+sqrt(2)+init-frameNum, xLimit+init-frameNum, xLimit-sqrt(2)+init-frameNum, -xLimit+init-frameNum];
-    yCorners = [yLimit+init-frameNum, -yLimit+sqrt(2)+init-frameNum, -yLimit+init-frameNum, yLimit-sqrt(2)+init-frameNum];
+    %yCorners = [yLimit+init-frameNum, -yLimit+sqrt(2)+init-frameNum, -yLimit+init-frameNum, yLimit-sqrt(2)+init-frameNum];
+    yCorners = [xLimit+init-frameNum, -xLimit+sqrt(2)+init-frameNum, -xLimit+init-frameNum, xLimit-sqrt(2)+init-frameNum];
   case 5
     xCorners = [xLimit-frameNum, xLimit-frameNum, xLimit-2-frameNum, xLimit-2-frameNum];
     yCorners = [yLimit, -yLimit, -yLimit, yLimit];
   case 6
     xCorners = [xLimit+init-frameNum, -xLimit+sqrt(2)+init-frameNum, -xLimit+init-frameNum, xLimit-sqrt(2)+init-frameNum];
-    yCorners = [yLimit-sqrt(2)-init+frameNum, -yLimit-init+frameNum, -yLimit+sqrt(2)-init+frameNum, yLimit-init+frameNum];
+    %yCorners = [yLimit-sqrt(2)-init+frameNum, -yLimit-init+frameNum, -yLimit+sqrt(2)-init+frameNum, yLimit-init+frameNum];
+    yCorners = [xLimit-sqrt(2)-init+frameNum, -xLimit-init+frameNum, -xLimit+sqrt(2)-init+frameNum, xLimit-init+frameNum];
   case 7
     xCorners = [-xLimit, xLimit, xLimit, -xLimit]; 
     yCorners = [-yLimit+frameNum, -yLimit+frameNum, -yLimit+2+frameNum, -yLimit+2+frameNum];
   case 8
     xCorners = [-xLimit-init+frameNum, xLimit-sqrt(2)-init+frameNum, xLimit-init+frameNum, -xLimit+sqrt(2)-init+frameNum];
-    yCorners = [yLimit-sqrt(2)-init+frameNum, -yLimit-init+frameNum, -yLimit+sqrt(2)-init+frameNum, yLimit-init+frameNum];
+    %yCorners = [yLimit-sqrt(2)-init+frameNum, -yLimit-init+frameNum, -yLimit+sqrt(2)-init+frameNum, yLimit-init+frameNum];
+    yCorners = [xLimit-sqrt(2)-init+frameNum, -xLimit-init+frameNum, -xLimit+sqrt(2)-init+frameNum, xLimit-init+frameNum];
 end
 mglPolygon(xCorners, yCorners, 0);
 coords = [xCorners; yCorners]';
