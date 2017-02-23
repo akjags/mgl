@@ -7,21 +7,38 @@
 %
 %
 
-function [myscreen,stimImage] = mglDoubleBars(numBlocks)
+function [myscreen,stimImage] = mglDoubleBars(blockNum, frameGrab)
 
-global myscreen xLimit yLimit stimulus;
+global xLimit yLimit stimulus;
 
 % Initialize the screen
-myscreen = initScreen('stimscreen');
-myscreen.background = 'gray';
+if ~ieNotDefined('frameGrab')
+  myscreen.background = 'black';
+else
+  myscreen.background = 'gray';
+end
+%myscreen.displayName = 'fMRIprojFlex'; % Set to stimscreen for framegrabbing
+myscreen.displayName = 'stimscreen';
+myscreen = initScreen(myscreen);
 xLimit = myscreen.imageWidth / 2;
 yLimit = myscreen.imageHeight / 2;
 
+stimulus = [];
 % Init Stimulus
 myscreen = initStimulus('stimulus', myscreen);
 
+%stimfile = getLastStimfile(myscreen);
+%keyboard;
+
+% Simulate ticks in run
+%mglSimulateRun(5, 10, 10);
+
 %% Frame Grab: set to 1 (and change screen above to stimscreen) to create 192x108 stimimage
-stimulus.frameGrab = 1;
+if ~ieNotDefined('frameGrab')
+  stimulus.frameGrab = 1;
+else
+  stimulus.frameGrab = 0;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %   Task 1: Fixation Stimulus
@@ -31,9 +48,8 @@ if stimulus.frameGrab == 1
   disp('frame grab is on');
   stimulusTaskNum = 1;
   myscreen.background = 'black';
+  stimulus.stimImage = NaN(myscreen.screenWidth, myscreen.screenHeight, 3, 960);
 else
-  mglClearScreen(0.5); mglFlush; mglClearScreen(0.5);
-  myscreen.background = 'gray';
   fixTaskNum = 1;
   stimulusTaskNum = 2;
 
@@ -56,33 +72,72 @@ end
 stimulus.fixedRandom = 0;
 
 % Set stimulus parameters
-stimulus.numCycles = 20;
+stimulus.numCycles = 10;
 stimulus.initialHalfCycle = 0;
 stimulus.stepsPerCycle = 24;
-stimulus.stimulusPeriod = 24;
+if stimulus.frameGrab == 1
+  stimulus.stimulusPeriod = 5; 
+else
+  stimulus.stimulusPeriod = 48;
+end
 stimulus.xOffset = 0; stimulus.yOffset = 0;
-stimulus.barWidth = 4;
+stimulus.barWidth = 2;
 stimulus.imageWidth = myscreen.imageWidth;
 stimulus.imageHeight = myscreen.imageHeight;
 
 %initialize bar rotation matrix
 stimulus.barRotMatrix1 = [cos(0) sin(0); -cos(0) sin(0)];
-stimulus.barRotMatrix2 = [cos(90) sin(90); -cos(90) sin(90)];
+stimulus.barRotMatrix2 = [cos(0) sin(0); -cos(0) sin(0)];
 
 %counter of number of stimulus segments
 stimulus.segNum = 0;
 
 % Task 2 is the retinotopy double bars
 task{stimulusTaskNum}{1}.waitForBacktick = 1;
-task{stimulusTaskNum}{1}.seglen(1:stimulus.stepsPerCycle) = repmat(stimulus.stimulusPeriod / stimulus.stepsPerCycle, 1, stimulus.stepsPerCycle);
-task{stimulusTaskNum}{1}.parameter.bar1Angle = 0:45:359;
-task{stimulusTaskNum}{1}.parameter.bar2Angle = 0:45:359;
+
+%task{stimulusTaskNum}{1}.seglen(1:stimulus.stepsPerCycle) = 4*(stimulus.stimulusPeriod / stimulus.stepsPerCycle)/5;
+%task{stimulusTaskNum}{1}.parameter.bar1Angle = 0:45:359;
+%task{stimulusTaskNum}{1}.parameter.bar2Angle = 0:45:359;
 task{stimulusTaskNum}{1}.parameter.contrast = 1:8;
 %task{stimulusTaskNum}{1}.randVars.calculated.elementAngle = nan;
 task{stimulusTaskNum}{1}.numSegs = stimulus.stepsPerCycle;
 task{stimulusTaskNum}{1}.numTrials = stimulus.numCycles;
 task{stimulusTaskNum}{1}.random = 1;
-task{stimulusTaskNum}{1}.synchToVol(1:stimulus.stepsPerCycle) = 0;
+if ~ieNotDefined('synchEveryVol') && synchEveryVol == 1
+  disp('Synching to Vol after every segment');
+  task{stimulusTaskNum}{1}.seglen(1:stimulus.stepsPerCycle) = 4*(stimulus.stimulusPeriod / stimulus.stepsPerCycle)/5;
+  task{stimulusTaskNum}{1}.synchToVol(1:stimulus.stepsPerCycle) = 1;
+else
+  disp('Only synching to vol after last segment');
+  task{stimulusTaskNum}{1}.synchToVol(1:stimulus.stepsPerCycle) = 0;
+  task{stimulusTaskNum}{1}.seglen(1:stimulus.stepsPerCycle) = (stimulus.stimulusPeriod / stimulus.stepsPerCycle);
+  if stimulus.frameGrab == 0
+    task{stimulusTaskNum}{1}.seglen(stimulus.stepsPerCycle) = 4*(stimulus.stimulusPeriod / stimulus.stepsPerCycle)/5;
+    task{stimulusTaskNum}{1}.synchToVol(stimulus.stepsPerCycle) = 1;
+  end
+end
+
+%%%%% Set up Conditions: 8 directions, 4 single bar contrasts, 3 double bar contrast combinations.
+% Set up bar directions
+dirs = 0:45:359; 
+dirs1 = repmat(dirs, 4,1);
+singleContrasts = [.0625 0; .125 0; .675 0; 1 0];
+singleContrastsDirs = repmat(singleContrasts, 8,1);
+singleBarContrastWithDirs = [singleContrastsDirs dirs1(:) repmat(-1, 32, 1)]; % size = (32, 4)
+
+doubleContrasts = [.25 .75; .5 .5; .75 .25];
+doubleContrastDirs = repmat(doubleContrasts, 28, 1); % length: 84
+dirBar1 = [repmat(0, 21, 1); repmat(45, 18, 1); repmat(90, 15, 1); repmat(135, 12, 1); repmat(180, 9, 1); repmat(225, 6, 1); repmat(270, 3, 1)];
+d = repmat(dirs(2:end), 3, 1); d = d(:); dirBar2 = [d; d(4:end); d(7:end); d(10:end); d(13:end); d(16:end); d(19:end)]; % length: 84
+doubleBarContrastWithDirs = [doubleContrastDirs dirBar1 dirBar2]; % size = (84, 4)
+
+%% 116 total conditions: first 32 in array are single bars (bar1 contrast = 0), last 84 are double bars
+stimulus.conditions = [singleBarContrastWithDirs; doubleBarContrastWithDirs]; 
+numConditions = size(stimulus.conditions,1);
+task{stimulusTaskNum}{1}.parameter.conditionNum = 1:numConditions;
+
+% Set up randomization
+stimulus.blockNum = blockNum;
 
 %Add traces
 [task{stimulusTaskNum}{1} myscreen] = addTraces(task{stimulusTaskNum}{1},myscreen,'maskPhase');
@@ -112,7 +167,11 @@ while (phaseNum <= length(task{stimulusTaskNum})) && ~myscreen.userHitEsc
 end
 
 % if we got here, we are at the end of the experiment
-stimImage = stimulus.stimImage;
+if isfield(stimulus, 'stimImage')
+  stimImage = stimulus.stimImage;
+else
+  stimImage = -1;
+end
 myscreen = endTask(myscreen,task);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -152,10 +211,19 @@ mglStencilCreateBegin(3);
 bar1 = [coords1(1,:)' coords1(2,:)'];
 bar2 = [coords2(1,:)' coords2(2,:)'];
 % if 0 or 180, vertical
-if(stimulus.bar1Angle == 0 || stimulus.bar1Angle == 180)
+if abs(stimulus.bar1Angle - stimulus.bar2Angle) == 180 || stimulus.bar2Angle == -1
+  % do nothing
+  disp('no overlap drawn');
+elseif stimulus.bar1Angle == 0 %|| stimulus.bar1Angle == 180)
   calcDrawOverlap(bar1, bar2, 1);
-elseif(stimulus.bar2Angle == 0 || stimulus.bar2Angle == 180)
+elseif stimulus.bar1Angle == 180
+  bar1a = [bar1(3:4,:); bar1(1:2,:)];
+  calcDrawOverlap(bar1a, bar2, 1);
+elseif stimulus.bar2Angle == 0 %|| stimulus.bar2Angle == 180)
   calcDrawOverlap(bar1, bar2, 2);
+elseif stimulus.bar2Angle == 180
+  bar2a = [bar2(3:4,:); bar2(1:2,:)];
+  calcDrawOverlap(bar1, bar2a, 2);
 else
   calcDrawOverlap(bar1,bar2);
 end
@@ -172,29 +240,39 @@ function [task myscreen] = startTrialCallback(task, myscreen)
 
 global stimulus;
 
+numConditions = size(stimulus.conditions,1);
+
+% Get trial number
+seed = 4084807311;
+rng('default');
+rng(seed);
+conditionOrder = randsample(numConditions, numConditions, false);
+
 % Set up bar directions at start of trial
-%dirs = [0 180; 45 225; 90 270; 135 315];
-dirs = [45 225; 90 270; 135 315];
-bars = randsample(size(dirs,1),2,false);
-%bars = datasample(0:45:359, 2, 'Replace', false);
-task.thistrial.bar1Angle = dirs(bars(1), randsample(2,1));
-task.thistrial.bar2Angle = dirs(bars(2), randsample(2,1));
-c = cos(pi*task.thistrial.bar1Angle/180);
-s = sin(pi*task.thistrial.bar1Angle/180);
-stimulus.bar1Angle = task.thistrial.bar1Angle;
+task.thistrial.conditionNum = conditionOrder((stimulus.blockNum-1)*stimulus.numCycles + task.trialnum); 
+disp(sprintf('----Condition Number: %d-----', task.thistrial.conditionNum));
+trialCondition = stimulus.conditions(task.thistrial.conditionNum, :);
+stimulus.contrast1 = trialCondition(1);
+stimulus.contrast2 = trialCondition(2);
+stimulus.bar1Angle = trialCondition(3);
+stimulus.bar2Angle = trialCondition(4);
+
+%task.thistrial.bar1Angle = dirs(bars(1), randsample(2,1));
+%task.thistrial.bar2Angle = dirs(bars(2), randsample(2,1));
+c = cos(pi*stimulus.bar1Angle/180);
+s = sin(pi*stimulus.bar1Angle/180);
 stimulus.barRotMatrix1 = [c s;-s c];
 
-c = cos(pi*task.thistrial.bar2Angle/180);
-s = sin(pi*task.thistrial.bar2Angle/180);
-stimulus.bar2Angle = task.thistrial.bar2Angle;
+c = cos(pi*stimulus.bar2Angle/180);
+s = sin(pi*stimulus.bar2Angle/180);
 stimulus.barRotMatrix2 = [c s; -s c];
 
 % Set up bar contrasts at start of trial
-contrastTable = [.1 .4; .2 .5; .25 .35; .5 .2; .5 .5; .1 .9; .9 .1; .4 .6];
-stimulus.contrast1 = contrastTable(task.thistrial.contrast, 1);
-stimulus.contrast2 = contrastTable(task.thistrial.contrast, 2);
-disp(sprintf('Bar 1 Contrast: %d%%. Bar 2 Contrast: %d%%', 100*stimulus.contrast1, 100*stimulus.contrast2));
-disp(sprintf('Bar 1 angle: %d. Bar 2 angle: %d', task.thistrial.bar1Angle, task.thistrial.bar2Angle));
+%contrastTable = [.1 .4; .2 .5; .25 .35; .5 .2; .5 .5; .1 .9; .9 .1; .4 .6];
+%stimulus.contrast1 = contrastTable(task.thistrial.contrast, 1);
+%stimulus.contrast2 = contrastTable(task.thistrial.contrast, 2);
+disp(sprintf('Bar 1 Contrast: %.01f%%. Bar 2 Contrast: %d%%', 100*stimulus.contrast1, 100*stimulus.contrast2));
+disp(sprintf('Bar 1 angle: %d. Bar 2 angle: %d', stimulus.bar1Angle, stimulus.bar2Angle));
 
 
 %--------------------------------------------
@@ -217,8 +295,8 @@ stimulus.barMaskWidth = stimulus.imageWidth*1.5;
 stimulus.barSweepExtent = 'max';
 
 barDirVec = abs(stimulus.barRotMatrix1*[1 0]');
-%sweepExtent = max(barDirVec(1)*stimulus.imageWidth, barDirVec(2)*stimulus.imageHeight);
-sweepExtent = min(stimulus.imageWidth, stimulus.imageHeight);
+sweepExtent = max(barDirVec(1)*stimulus.imageWidth, barDirVec(2)*stimulus.imageHeight);
+%sweepExtent = min(stimulus.imageWidth, stimulus.imageHeight);
 stepSize = sweepExtent / (stimulus.stepsPerCycle-1);
 stimulus.barCenter1 = [];
 if isodd(stimulus.stepsPerCycle)
@@ -270,13 +348,14 @@ stimulus.phaseNumRect = 1;
 stimulus.xRectOffset = 0;
 stimulus.phaseNum = 1;
 stimulus.frameCount = 1;
+stimulus.frameTime = 0;
 
 %--------------------------------------------
 % updateRetinotopyStimulus
 %     draws retinotopy stimulus to screen
 %--------------------------------------------
 function stimulus = updateRetinotopyStimulus(stimulus, myscreen)
-
+%stimulus.t = mglGetSecs;
 if stimulus.frameGrab == 1
 
   xScrn = [-myscreen.imageWidth/2 -myscreen.imageWidth/2 myscreen.imageWidth/2 myscreen.imageWidth/2];
@@ -290,12 +369,18 @@ if stimulus.frameGrab == 1
   mglStencilSelect(3);
   mglPolygon(xScrn, yScrn, stimulus.contrast1+stimulus.contrast2);
   mglStencilSelect(0);
-
-  stimulus.stimImage(:,:,:,stimulus.segNum) = mglFrameGrab;
+  
+  stimIm = mglFrameGrab;
+  frameIndex = 4*(stimulus.segNum-1)+1;
+  %disp(sprintf('Grabbing frames %d through %d', frameIndex, frameIndex+3));
+  stimulus.stimImage(:,:,:,frameIndex) = stimIm;
+  stimulus.stimImage(:,:,:,frameIndex+1) = stimIm;
+  stimulus.stimImage(:,:,:,frameIndex+2) = stimIm;
+  stimulus.stimImage(:,:,:,frameIndex+3) = stimIm;
 end
 
-if stimulus.frameGrab == 0
-  i = 1 + mod(stimulus.frameCount,2);
+if stimulus.frameGrab==0 %&& mglGetSecs(stimulus.frameTime) >= 2;
+  i = stimulus.frameCount; 
   mglClearScreen;
   mglStencilSelect(1);
   drawCheckerboard(stimulus.contrast1, i);
@@ -305,7 +390,10 @@ if stimulus.frameGrab == 0
   drawCheckerboard(stimulus.contrast1+stimulus.contrast2, i);
   mglStencilSelect(0);
 
-  stimulus.frameCount = stimulus.frameCount + 1;
+  if mglGetSecs(stimulus.frameTime)>=0.25
+    stimulus.frameCount = stimulus.frameCount+1;
+    stimulus.frameTime = mglGetSecs;
+  end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -345,7 +433,7 @@ if vert == 1
   p3(1) = x2; p3(2) = fB2(1)*x2 + fB2(2);
   p4(1) = x1; p4(2) = fB2(1)*x1 + fB2(2);
 elseif vert == 2
-  x1 = bar2(1,1); x2 = bar2(1,1);
+  x1 = bar2(1,1); x2 = bar2(3,1);
   p1(1) = x1; p1(2) = rB1(1)*x1 + rB1(2);
   p2(1) = x2; p2(2) = rB1(1)*x2 + rB1(2);
   p3(1) = x2; p3(2) = fB1(1)*x2 + fB1(2);
