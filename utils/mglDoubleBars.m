@@ -18,6 +18,7 @@ else
   myscreen.background = 'gray';
 end
 %myscreen.displayName = 'fMRIprojFlex'; % Set to stimscreen for framegrabbing
+%myscreen.displayName = 'test';
 myscreen.displayName = 'stimscreen';
 myscreen = initScreen(myscreen);
 xLimit = myscreen.imageWidth / 2;
@@ -48,12 +49,12 @@ if stimulus.frameGrab == 1
   disp('frame grab is on');
   stimulusTaskNum = 1;
   myscreen.background = 'black';
-  stimulus.stimImage = NaN(myscreen.screenWidth, myscreen.screenHeight, 3, 960);
+  stimulus.stimImage = zeros(myscreen.screenWidth, myscreen.screenHeight, 3, 960);
 else
   fixTaskNum = 1;
   stimulusTaskNum = 2;
 
-  fixStimulus.diskSize = 0.5;
+  fixStimulus.diskSize = 0.25;
   fixStimulus.fixWidth = 1;
   fixStimulus.fixLineWidth = 3;
   fixStimulus.stimTime = 0.5;
@@ -74,11 +75,15 @@ stimulus.fixedRandom = 0;
 % Set stimulus parameters
 stimulus.numCycles = 10;
 stimulus.initialHalfCycle = 0;
-stimulus.stepsPerCycle = 24;
+% 03/17 - changed stepsPerCycle from 24 to 48 & stimulusPeriod from 48 to 24
+stimulus.stepsPerCycle = 48;
 if stimulus.frameGrab == 1
+  stimulus.stepsPerCycle = 24; %% Get rid of this after grabbing stim images for my last scan
   stimulus.stimulusPeriod = 5; 
 else
-  stimulus.stimulusPeriod = 48;
+  % FIX FIX FIX: change back to 48 for old scans, and 24 for new scans
+  % (post - 3/20)
+  stimulus.stimulusPeriod = 5;
 end
 stimulus.xOffset = 0; stimulus.yOffset = 0;
 stimulus.barWidth = 2;
@@ -119,20 +124,39 @@ end
 
 %%%%% Set up Conditions: 8 directions, 4 single bar contrasts, 3 double bar contrast combinations.
 % Set up bar directions
-dirs = 0:45:359; 
-dirs1 = repmat(dirs, 4,1);
-singleContrasts = [.0625 0; .125 0; .675 0; 1 0];
-singleContrastsDirs = repmat(singleContrasts, 8,1);
-singleBarContrastWithDirs = [singleContrastsDirs dirs1(:) repmat(-1, 32, 1)]; % size = (32, 4)
+%dirs = 0:45:359; 
+%dirs1 = repmat(dirs, 4,1);
+%singleContrasts = [.0625 0; .125 0; .675 0; 1 0];
+%singleContrastsDirs = repmat(singleContrasts, 8,1);
+%singleBarContrastWithDirs = [singleContrastsDirs dirs1(:) repmat(-1, 32, 1)]; % size = (32, 4)
 
-doubleContrasts = [.25 .75; .5 .5; .75 .25];
-doubleContrastDirs = repmat(doubleContrasts, 28, 1); % length: 84
-dirBar1 = [repmat(0, 21, 1); repmat(45, 18, 1); repmat(90, 15, 1); repmat(135, 12, 1); repmat(180, 9, 1); repmat(225, 6, 1); repmat(270, 3, 1)];
-d = repmat(dirs(2:end), 3, 1); d = d(:); dirBar2 = [d; d(4:end); d(7:end); d(10:end); d(13:end); d(16:end); d(19:end)]; % length: 84
-doubleBarContrastWithDirs = [doubleContrastDirs dirBar1 dirBar2]; % size = (84, 4)
+%doubleContrasts = [.25 .75; .5 .5; .75 .25];
+%doubleContrastDirs = repmat(doubleContrasts, 28, 1); % length: 84
+%dirBar1 = [repmat(0, 21, 1); repmat(45, 18, 1); repmat(90, 15, 1); repmat(135, 12, 1); repmat(180, 9, 1); repmat(225, 6, 1); repmat(270, 3, 1)];
+%d = repmat(dirs(2:end), 3, 1); d = d(:); dirBar2 = [d; d(4:end); d(7:end); d(10:end); d(13:end); d(16:end); d(19:end)]; % length: 84
+%doubleBarContrastWithDirs = [doubleContrastDirs dirBar1 dirBar2]; % size = (84, 4)
 
 %% 116 total conditions: first 32 in array are single bars (bar1 contrast = 0), last 84 are double bars
-stimulus.conditions = [singleBarContrastWithDirs; doubleBarContrastWithDirs]; 
+%stimulus.conditions = [singleBarContrastWithDirs; doubleBarContrastWithDirs]; 
+%numConditions = size(stimulus.conditions,1);
+%task{stimulusTaskNum}{1}.parameter.conditionNum = 1:numConditions;
+
+%%%% Set up new Conditions: 4 directions, 4 single bar contrasts, 3 double bar contrast combinations.
+dirs = 45:90:315; % just the diagonal sweeps
+
+singleBarContrasts = [.0625 .125 .375 .675 1];
+sbc = repmat(singleBarContrasts,length(dirs),1); sbc = sbc(:); %% this is the column of single bar contrasts
+singleDir = repmat(dirs', 1, length(singleBarContrasts)); singleDir = singleDir(:);
+singleBarContrastWithDirs = [sbc zeros(length(dirs)*length(singleBarContrasts),1) singleDir repmat(-1,length(dirs)*length(singleBarContrasts),1)];
+
+doubleBarContrasts = [.25 .5 .75];
+doubleContrasts = repmat(doubleBarContrasts, 6, 1);
+doubleContrasts = doubleContrasts(:);
+doubleDirs = [45 135; 45 225; 45 315; 135 225; 135 315; 225 315];
+doubleBarContrastWithDirs = [doubleContrasts flipud(doubleContrasts) repmat(doubleDirs,3,1)];
+
+addlConds = [.25 .75 45 135; .25 .75 45 225];
+stimulus.conditions = [singleBarContrastWithDirs; doubleBarContrastWithDirs; addlConds]; 
 numConditions = size(stimulus.conditions,1);
 task{stimulusTaskNum}{1}.parameter.conditionNum = 1:numConditions;
 
@@ -203,7 +227,9 @@ mglStencilCreateBegin(2);
 x = stimulus.xBar2(:,segNum);
 y = stimulus.yBar2(:,segNum);
 coords2 = stimulus.barRotMatrix2*[x(:,1)';y(:,1)'];
-mglQuad(coords2(1,:)', coords2(2,:)', [0;0;0]);
+if stimulus.bar2Angle ~= -1
+  mglQuad(coords2(1,:)', coords2(2,:)', [0;0;0]);
+end
 mglStencilCreateEnd;
 mglClearScreen;
 
@@ -213,7 +239,7 @@ bar2 = [coords2(1,:)' coords2(2,:)'];
 % if 0 or 180, vertical
 if abs(stimulus.bar1Angle - stimulus.bar2Angle) == 180 || stimulus.bar2Angle == -1
   % do nothing
-  disp('no overlap drawn');
+  %disp('no overlap drawn');
 elseif stimulus.bar1Angle == 0 %|| stimulus.bar1Angle == 180)
   calcDrawOverlap(bar1, bar2, 1);
 elseif stimulus.bar1Angle == 180
@@ -390,7 +416,7 @@ if stimulus.frameGrab==0 %&& mglGetSecs(stimulus.frameTime) >= 2;
   drawCheckerboard(stimulus.contrast1+stimulus.contrast2, i);
   mglStencilSelect(0);
 
-  if mglGetSecs(stimulus.frameTime)>=0.25
+  if mglGetSecs(stimulus.frameTime)>=0.1
     stimulus.frameCount = stimulus.frameCount+1;
     stimulus.frameTime = mglGetSecs;
   end
